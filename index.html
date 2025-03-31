@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Gerenciamento de Demandas</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+    }
+    .container {
+      width: 80%;
+      margin: 0 auto;
+    }
+    header {
+      background-color: #0073e6;
+      color: white;
+      padding: 10px 0;
+      text-align: center;
+    }
+    nav {
+      margin: 20px 0;
+    }
+    nav a {
+      margin: 10px;
+      text-decoration: none;
+      color: #0073e6;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .content {
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      display: none;
+    }
+    .active {
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #0073e6;
+      color: white;
+    }
+    button {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background-color: #0073e6;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .filters {
+      margin-bottom: 15px;
+    }
+    .filters label {
+      margin-right: 10px;
+    }
+  </style>
+  <script>
+    let setores = [];
+    let usuarios = [];
+    let demandas = [];
+
+    // Função para exibir o conteúdo da página ativa
+    function showPage(pageId) {
+      var pages = document.querySelectorAll('.content');
+      pages.forEach(page => page.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
+    }
+
+    // Funções para Setor de Aplicação
+    function adicionarSetor() {
+      let nomeSetor = document.getElementById("nome_setor").value;
+      let funcaoSetor = document.getElementById("funcao").value;
+      if (nomeSetor && funcaoSetor) {
+        setores.push({ nome: nomeSetor, funcao: funcaoSetor });
+        document.getElementById("nome_setor").value = '';
+        document.getElementById("funcao").value = '';
+        exibirSetores();
+        preencherSetorAtuacao();
+        preencherSetorUsuario();
+      }
+    }
+
+    function excluirSetor(index) {
+      setores.splice(index, 1);
+      exibirSetores();
+      preencherSetorAtuacao();
+      preencherSetorUsuario();
+    }
+
+    function exibirSetores() {
+      const listaSetores = document.getElementById("lista-setores");
+      listaSetores.innerHTML = '';
+      setores.forEach((setor, index) => {
+        let li = document.createElement("li");
+        li.innerHTML = `${setor.nome} - ${setor.funcao} <button onclick="excluirSetor(${index})">Excluir</button>`;
+        listaSetores.appendChild(li);
+      });
+    }
+
+    // Função para preencher Setor de Atuação na Criação de Demandas e Setor de Usuário
+    function preencherSetorAtuacao() {
+      const setorSelect = document.getElementById("setor");
+      setorSelect.innerHTML = '';
+      setores.forEach(setor => {
+        let option = document.createElement("option");
+        option.value = setor.nome;
+        option.textContent = setor.nome;
+        setorSelect.appendChild(option);
+      });
+    }
+
+    function preencherSetorUsuario() {
+      const setorSelect = document.getElementById("setor_usuario");
+      setorSelect.innerHTML = '';
+      setores.forEach(setor => {
+        let option = document.createElement("option");
+        option.value = setor.nome;
+        option.textContent = setor.nome;
+        setorSelect.appendChild(option);
+      });
+    }
+
+    // Funções para Cadastro de Usuários
+    function adicionarUsuario() {
+      let nomeUsuario = document.getElementById("nome_usuario").value;
+      let dataNascimento = document.getElementById("data_nascimento").value;
+      let dataAdmissao = document.getElementById("data_admissao").value;
+      let funcaoUsuario = document.getElementById("funcao_usuario").value;
+      let setorUsuario = document.getElementById("setor_usuario").value;
+
+      if (nomeUsuario && dataNascimento && dataAdmissao && funcaoUsuario && setorUsuario) {
+        let novoUsuario = { nomeUsuario, dataNascimento, dataAdmissao, funcaoUsuario, setorUsuario };
+        usuarios.push(novoUsuario);
+        document.getElementById("nome_usuario").value = '';
+        document.getElementById("data_nascimento").value = '';
+        document.getElementById("data_admissao").value = '';
+        document.getElementById("funcao_usuario").value = '';
+        document.getElementById("setor_usuario").value = '';
+        exibirUsuarios();
+        preencherExecutorDemandas();
+      }
+    }
+
+    function exibirUsuarios() {
+      const listaUsuarios = document.getElementById("lista-usuarios");
+      listaUsuarios.innerHTML = '';
+      usuarios.forEach((usuario, index) => {
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${usuario.nomeUsuario}</td>
+          <td>${usuario.dataNascimento}</td>
+          <td>${usuario.dataAdmissao}</td>
+          <td>${usuario.funcaoUsuario}</td>
+          <td>${usuario.setorUsuario}</td>
+        `;
+        listaUsuarios.appendChild(tr);
+      });
+    }
+
+    // Funções para Demandas
+    function adicionarDemanda() {
+      let descricao = document.getElementById("descricao").value;
+      let setorAtuacao = document.getElementById("setor").value;
+      let executor = document.getElementById("executor").value;
+      let dataAbertura = document.getElementById("data_abertura").value;
+      let status = "Em andamento";
+
+      if (descricao && setorAtuacao && executor && dataAbertura) {
+        let novaDemanda = { descricao, setorAtuacao, executor, dataAbertura, status };
+        demandas.push(novaDemanda);
+        document.getElementById("descricao").value = '';
+        document.getElementById("executor").value = '';
+        document.getElementById("data_abertura").value = '';
+        exibirDemandas();
+      }
+    }
+
+    function excluirDemanda(index) {
+      demandas.splice(index, 1);
+      exibirDemandas();
+    }
+
+    function concluirDemanda(index) {
+      demandas[index].status = "Concluído";
+      exibirDemandas();
+    }
+
+    function exibirDemandas() {
+      const listaDemandas = document.getElementById("lista-demandas");
+      listaDemandas.innerHTML = '';
+      demandas.forEach((demanda, index) => {
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${demanda.descricao}</td>
+          <td>${demanda.setorAtuacao}</td>
+          <td>${demanda.executor}</td>
+          <td>${demanda.dataAbertura}</td>
+          <td>${demanda.status}</td>
+          <td>
+            <button onclick="concluirDemanda(${index})">Concluir</button>
+            <button onclick="excluirDemanda(${index})">Excluir</button>
+          </td>
+        `;
+        listaDemandas.appendChild(tr);
+      });
+    }
+
+    // Funções para Consulta de Atividades
+    function showConsultaAtividades() {
+      const listaAtividades = document.getElementById("lista-atividades");
+      listaAtividades.innerHTML = '';
+      demandas.forEach((demanda, index) => {
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${demanda.descricao}</td>
+          <td>${demanda.setorAtuacao}</td>
+          <td>${demanda.executor}</td>
+          <td>${demanda.dataAbertura}</td>
+          <td>${demanda.status}</td>
+        `;
+        listaAtividades.appendChild(tr);
+      });
+    }
+
+    function pesquisarAtividades() {
+      const executorPesquisa = document.getElementById("pesquisar-executor").value.toLowerCase();
+      const statusPesquisa = document.getElementById("pesquisar-status").value.toLowerCase();
+      const setorPesquisa = document.getElementById("pesquisar-setor").value.toLowerCase();
+
+      const listaAtividades = document.getElementById("lista-atividades");
+      listaAtividades.innerHTML = '';
+
+      demandas.filter(demanda => {
+        return (demanda.executor.toLowerCase().includes(executorPesquisa) &&
+                demanda.status.toLowerCase().includes(statusPesquisa) &&
+                demanda.setorAtuacao.toLowerCase().includes(setorPesquisa));
+      }).forEach((demanda, index) => {
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${index + 1}</td>
+          <td>${demanda.descricao}</td>
+          <td>${demanda.setorAtuacao}</td>
+          <td>${demanda.executor}</td>
+          <td>${demanda.dataAbertura}</td>
+          <td>${demanda.status}</td>
+        `;
+        listaAtividades.appendChild(tr);
+      });
+    }
+
+    // Função para preencher o campo Executor com os usuários cadastrados
+    function preencherExecutorDemandas() {
+      const executorSelect = document.getElementById("executor");
+      executorSelect.innerHTML = '';
+      usuarios.forEach(usuario => {
+        let option = document.createElement("option");
+        option.value = usuario.nomeUsuario;
+        option.textContent = usuario.nomeUsuario;
+        executorSelect.appendChild(option);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      showPage('home');
+      preencherExecutorDemandas();
+    });
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Sistema de Gerenciamento de Demandas</h1>
+  </header>
+  <div class="container">
+    <nav>
+      <a href="javascript:void(0);" onclick="showPage('cadastro-setores')">Cadastro de Setores</a>
+      <a href="javascript:void(0);" onclick="showPage('cadastro-usuarios')">Cadastro de Usuários</a>
+      <a href="javascript:void(0);" onclick="showPage('cadastro-demandas')">Cadastro de Demandas</a>
+      <a href="javascript:void(0);" onclick="showPage('consulta-atividades')">Consulta de Atividades</a>
+    </nav>
+    <div id="home" class="content active">
+      <h2>Bem-vindo ao Sistema de Gerenciamento de Demandas</h2>
+      <p>Escolha uma opção no menu para começar.</p>
+    </div>
+
+    <!-- Cadastro de Setores -->
+    <div id="cadastro-setores" class="content">
+      <h2>Cadastro de Setores</h2>
+      <input type="text" id="nome_setor" placeholder="Nome do Setor" />
+      <input type="text" id="funcao" placeholder="Função do Setor" />
+      <button onclick="adicionarSetor()">Adicionar Setor</button>
+      <ul id="lista-setores"></ul>
+    </div>
+
+    <!-- Cadastro de Usuários -->
+    <div id="cadastro-usuarios" class="content">
+      <h2>Cadastro de Usuários</h2>
+      <input type="text" id="nome_usuario" placeholder="Nome do Usuário" />
+      <input type="date" id="data_nascimento" placeholder="Data de Nascimento" />
+      <input type="date" id="data_admissao" placeholder="Data de Admissão" />
+      <input type="text" id="funcao_usuario" placeholder="Função do Usuário" />
+      <select id="setor_usuario">
+        <option value="">Selecione o Setor</option>
+      </select>
+      <button onclick="adicionarUsuario()">Adicionar Usuário</button>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Nome</th>
+            <th>Data Nascimento</th>
+            <th>Data Admissão</th>
+            <th>Função</th>
+            <th>Setor</th>
+          </tr>
+        </thead>
+        <tbody id="lista-usuarios"></tbody>
+      </table>
+    </div>
+
+    <!-- Cadastro de Demandas -->
+    <div id="cadastro-demandas" class="content">
+      <h2>Cadastro de Demandas</h2>
+      <input type="text" id="descricao" placeholder="Descrição da Demanda" />
+      <select id="setor">
+        <option value="">Selecione o Setor</option>
+      </select>
+      <select id="executor">
+        <option value="">Selecione o Executor</option>
+      </select>
+      <input type="date" id="data_abertura" placeholder="Data de Abertura" />
+      <button onclick="adicionarDemanda()">Adicionar Demanda</button>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Descrição</th>
+            <th>Setor</th>
+            <th>Executor</th>
+            <th>Data Abertura</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="lista-demandas"></tbody>
+      </table>
+    </div>
+
+    <!-- Consulta de Atividades -->
+    <div id="consulta-atividades" class="content">
+      <h2>Consulta de Atividades</h2>
+      <div class="filters">
+        <label>Executor:</label>
+        <input type="text" id="pesquisar-executor" oninput="pesquisarAtividades()" />
+        <label>Status:</label>
+        <select id="pesquisar-status" oninput="pesquisarAtividades()">
+          <option value="">Selecione Status</option>
+          <option value="Em andamento">Em andamento</option>
+          <option value="Concluído">Concluído</option>
+        </select>
+        <label>Setor:</label>
+        <input type="text" id="pesquisar-setor" oninput="pesquisarAtividades()" />
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Descrição</th>
+            <th>Setor</th>
+            <th>Executor</th>
+            <th>Data Abertura</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="lista-atividades"></tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
